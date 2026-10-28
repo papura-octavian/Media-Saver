@@ -1,7 +1,9 @@
 import React from 'react';
 import styles from './StatusPill.module.css';
 
-export type UiStatus = 'idle' | 'running' | 'cancelling' | 'finished' | 'error';
+import type { JobStatus } from '@shared/types';
+
+export type UiStatus = JobStatus;
 
 export function StatusPill(props: { status: UiStatus; rightLabel?: string | null }) {
   const mode: 'idle' | 'running' | 'done' | 'error' =
@@ -10,7 +12,9 @@ export function StatusPill(props: { status: UiStatus; rightLabel?: string | null
   const label =
     props.status === 'cancelling'
       ? 'CANCELLING'
-      : props.status === 'running'
+      : props.status === 'cancelled'
+        ? 'CANCELLED'
+        : props.status === 'running'
         ? 'RUNNING'
         : props.status === 'finished'
           ? 'DONE'

@@ -51,10 +51,11 @@ export function AdvancedOptionsPanel(props: {
                 value={s.youtubeClient}
                 onChange={(e) => props.onPatch({ youtubeClient: e.currentTarget.value as Settings['youtubeClient'] })}
                 data={[
-                  { value: 'android', label: 'android (recommended)' },
+                  { value: 'default', label: 'Automatic (recommended)' },
                   { value: 'web', label: 'web' },
+                  { value: 'tv', label: 'tv' },
                   { value: 'ios', label: 'ios' },
-                  { value: 'tv', label: 'tv' }
+                  { value: 'android', label: 'android' }
                 ]}
                 disabled={props.busy}
               />

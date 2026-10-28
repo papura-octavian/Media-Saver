@@ -45,11 +45,14 @@
 }
 
 .iconWrap {
-  width: 22px;
-  height: 22px;
+  width: 24px;
+  height: 24px;
+  border-radius: 7px;
   display: grid;
   place-items: center;
-  opacity: 0.92;
+  color: #0a0a12;
+  background: linear-gradient(135deg, #4cc9ff, #3ee8b5);
+  box-shadow: 0 6px 16px -8px #3ee8b5;
 }
 
 .title {

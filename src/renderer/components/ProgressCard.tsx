@@ -1,6 +1,6 @@
 import React from 'react';
 import { Button, Group, Progress, Stack, Text } from '@mantine/core';
-import { IconCheck, IconCopy, IconExclamationCircle } from '@tabler/icons-react';
+import { IconCheck, IconCopy, IconExclamationCircle, IconFolderOpen } from '@tabler/icons-react';
 import type { ProgressSnapshot } from '@shared/types';
 import surface from './SurfaceCard.module.css';
 import styles from './ProgressCard.module.css';
@@ -11,8 +11,10 @@ export function ProgressCard(props: {
   progress: ProgressSnapshot;
   pulse: boolean;
   destinationDir: string;
+  doneMessage?: string | null;
   errorSummary?: string | null;
   onCopyErrorDetails?: () => void;
+  onOpenFolder?: () => void;
 }) {
   const percent = props.progress.percent ?? 0;
   const title = props.progress.title ?? '';
@@ -21,6 +23,7 @@ export function ProgressCard(props: {
 
   const showDone = props.status === 'finished';
   const showError = props.status === 'error';
+  const processing = props.status === 'running' && props.progress.stage === 'processing';
 
   return (
     <div
@@ -32,15 +35,19 @@ export function ProgressCard(props: {
           <div>
             <Text fw={700}>Progress</Text>
             <Text size="sm" c="dimmed">
-              {props.status === 'running'
-                ? 'Downloading…'
-                : props.status === 'cancelling'
-                  ? 'Cancelling…'
-                  : props.status === 'finished'
-                    ? 'Saved'
-                    : props.status === 'error'
-                      ? 'Error'
-                      : 'Ready'}
+              {processing
+                ? 'Converting…'
+                : props.status === 'running'
+                  ? 'Downloading…'
+                  : props.status === 'cancelling'
+                    ? 'Cancelling…'
+                    : props.status === 'cancelled'
+                      ? 'Cancelled'
+                      : props.status === 'finished'
+                        ? 'Saved'
+                        : props.status === 'error'
+                          ? 'Error'
+                          : 'Ready'}
             </Text>
           </div>
 
@@ -49,7 +56,7 @@ export function ProgressCard(props: {
           </Text>
         </Group>
 
-        <Progress value={percent} radius="xl" size="md" />
+        <Progress value={percent} radius="xl" size="md" animated={processing} striped={processing} />
 
         <div className={styles.metaRow}>
           <div className={styles.titleLine} style={{ flex: 1, minWidth: 220 }}>
@@ -61,11 +68,19 @@ export function ProgressCard(props: {
         </div>
 
         {showDone ? (
-          <Group gap={10} mt={6}>
-            <IconCheck size={16} color="rgba(58,208,139,0.95)" />
-            <Text size="sm" c="dimmed">
-              Saved to <span style={{ color: 'rgba(255,255,255,0.82)' }}>{props.destinationDir || 'destination folder'}</span>
-            </Text>
+          <Group gap={10} mt={6} justify="space-between" wrap="nowrap">
+            <Group gap={10} wrap="nowrap" style={{ minWidth: 0 }}>
+              <IconCheck size={16} color="rgba(58,208,139,0.95)" style={{ flexShrink: 0 }} />
+              <Text size="sm" c="dimmed" style={{ minWidth: 0 }}>
+                {props.doneMessage ?? 'Saved.'} Folder:{' '}
+                <span style={{ color: 'rgba(255,255,255,0.82)', wordBreak: 'break-all' }}>{props.destinationDir || 'destination folder'}</span>
+              </Text>
+            </Group>
+            {props.onOpenFolder ? (
+              <Button size="xs" variant="light" leftSection={<IconFolderOpen size={14} />} onClick={props.onOpenFolder} style={{ flexShrink: 0 }}>
+                Open folder
+              </Button>
+            ) : null}
           </Group>
         ) : null}
 

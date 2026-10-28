@@ -7,6 +7,14 @@ param(
 )
 
 $ErrorActionPreference = "Stop"
+$ProgressPreference = "SilentlyContinue" # Invoke-WebRequest is many times slower with the progress bar on
+
+# Defaults: official yt-dlp release and the BtbN LGPL FFmpeg build. The "shared" variant keeps the codecs in DLLs
+# used by both ffmpeg.exe and ffprobe.exe, about 115 MB smaller than two static executables. Override with the env vars above.
+if (-not $YtDlpUrl) { $YtDlpUrl = "https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp.exe" }
+if (-not $FfmpegZipUrl -and -not $FfmpegUrl) {
+  $FfmpegZipUrl = "https://github.com/BtbN/FFmpeg-Builds/releases/latest/download/ffmpeg-master-latest-win64-lgpl-shared.zip"
+}
 
 function Write-Step($msg) {
   Write-Host "[media-saver] $msg"
@@ -27,15 +35,14 @@ $ffmpegPath = Join-Path $binDir "ffmpeg.exe"
 $ffprobePath = Join-Path $binDir "ffprobe.exe"
 
 if (-not (Test-Path $ytDlpPath) -or $Force) {
-  if (-not $YtDlpUrl) {
-    throw "YTDLP_URL not set. Example: `$env:YTDLP_URL='https://.../yt-dlp.exe'"
-  }
   Download-File $YtDlpUrl $ytDlpPath
 } else {
   Write-Step "yt-dlp.exe already exists, skipping."
 }
 
-if ($FfmpegZipUrl) {
+if ((Test-Path $ffmpegPath) -and -not $Force) {
+  Write-Step "ffmpeg.exe already exists, skipping."
+} elseif ($FfmpegZipUrl) {
   $tmpDir = Join-Path $env:TEMP ("media-saver-ffmpeg-" + [Guid]::NewGuid().ToString("N"))
   New-Item -ItemType Directory -Force -Path $tmpDir | Out-Null
   try {
@@ -54,25 +61,19 @@ if ($FfmpegZipUrl) {
     } else {
       Write-Step "ffprobe.exe not found inside zip; continuing."
     }
+
+    # Shared builds: the executables need the DLLs next to them.
+    Get-ChildItem -Path $ffmpegFound.DirectoryName -Filter "*.dll" | ForEach-Object {
+      Copy-Item -Force -Path $_.FullName -Destination $binDir
+    }
   } finally {
     Remove-Item -Recurse -Force $tmpDir
   }
-} elseif ($FfmpegUrl) {
-  if (-not (Test-Path $ffmpegPath) -or $Force) {
-    Download-File $FfmpegUrl $ffmpegPath
-  } else {
-    Write-Step "ffmpeg.exe already exists, skipping."
-  }
-
-  if ($FfprobeUrl) {
-    if (-not (Test-Path $ffprobePath) -or $Force) {
-      Download-File $FfprobeUrl $ffprobePath
-    } else {
-      Write-Step "ffprobe.exe already exists, skipping."
-    }
-  }
 } else {
-  throw "Set FFMPEG_ZIP_URL or FFMPEG_URL (and optionally FFPROBE_URL)."
+  Download-File $FfmpegUrl $ffmpegPath
+  if ($FfprobeUrl) {
+    Download-File $FfprobeUrl $ffprobePath
+  }
 }
 
 Write-Step "Done. Binaries are in resources/bin."

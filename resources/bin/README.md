@@ -9,8 +9,8 @@ Place these files here:
 - `ffprobe.exe` (recommended)
 
 You can also download them with:
-- `npm run prepare:bin`
-  - Set `YTDLP_URL` and either `FFMPEG_ZIP_URL` or `FFMPEG_URL` (+ optional `FFPROBE_URL`).
+- `npm run prepare:bin` (latest yt-dlp + BtbN LGPL FFmpeg by default)
+  - Override with `YTDLP_URL` and either `FFMPEG_ZIP_URL` or `FFMPEG_URL` (+ optional `FFPROBE_URL`).
 
 ### For releases
 Packaged builds copy `resources/bin/*` into `${process.resourcesPath}/bin/*` via `electron-builder` `extraResources`.

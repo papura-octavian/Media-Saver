@@ -12,19 +12,23 @@ Media Saver is a Windows-first desktop app (Electron + React) that downloads You
 - **Download modes**
   - Single URL (video or playlist)
   - Batch from TXT (one URL per line; ignores empty lines and lines starting with `#`)
-  - Playlist support: creates `destination/<playlist title>/` automatically
+  - Playlist support: creates `destination/<playlist title>/` automatically; unavailable entries are skipped
+  - Batch keeps going when one link fails and reports which ones did
 - **Formats**
   - MP3 (128 / 192 / 256 / 320 kbps)
   - MP4 (prefers best quality and 1080p when available)
 - **Advanced**
-  - YouTube client selection: android / web / ios / tv
+  - YouTube client selection: automatic (recommended) / web / tv / ios / android
   - Optional cookies from browser: chrome / edge / firefox / brave
   - Optional User-Agent override
   - Verbose logs toggle
 - **UX**
   - Progress: percent, title, speed, ETA, batch indicator
   - Console logs with copy/clear
-  - Cancel current job
+  - Cancel current job (removes the half-downloaded files); closing the app also stops yt-dlp
+- **Stays working**
+  - yt-dlp updates itself in the background (at most once a day), since YouTube changes often
+  - Uses the bundled Electron runtime as the JavaScript runtime yt-dlp now needs for YouTube
 - **Local-only settings**
   - Remembers destination and options (format, bitrate, client, cookies, UA, verbose)
 
@@ -41,7 +45,7 @@ Add screenshots here:
   - `resources/bin/yt-dlp.exe`
   - `resources/bin/ffmpeg.exe`
   - `resources/bin/ffprobe.exe` (recommended)
-  - Optional helper: `npm run prepare:bin` (requires env vars `YTDLP_URL` and either `FFMPEG_ZIP_URL` or `FFMPEG_URL`).
+  - Helper: `npm run prepare:bin` downloads the latest yt-dlp and the BtbN LGPL FFmpeg build (override with `YTDLP_URL`, `FFMPEG_ZIP_URL` or `FFMPEG_URL`).
 
 Note: binaries are **not committed** to this repo. See `resources/bin/README.md`.
 

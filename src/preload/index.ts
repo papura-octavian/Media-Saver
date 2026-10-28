@@ -9,6 +9,7 @@ const api: IpcApi = {
   startSingle: (args: IpcStartSingleArgs) => ipcRenderer.invoke('ui:startSingle', args) as Promise<void>,
   startBatch: (args: IpcStartBatchArgs) => ipcRenderer.invoke('ui:startBatch', args) as Promise<void>,
   cancelCurrent: () => ipcRenderer.invoke('ui:cancelCurrent') as Promise<void>,
+  openFolder: (folderPath: string) => ipcRenderer.invoke('ui:openFolder', folderPath) as Promise<void>,
 
   getSettings: () => ipcRenderer.invoke('ui:getSettings') as Promise<Settings>,
   setSettings: (patch: Partial<Settings>) => ipcRenderer.invoke('ui:setSettings', patch) as Promise<Settings>,

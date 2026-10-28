@@ -111,6 +111,9 @@ export function ActionCard(props: {
             placeholder="https://www.youtube.com/watch?v=..."
             value={props.url}
             onChange={(e) => props.onUrlChange(e.currentTarget.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' && canStartSingle) void props.onStartSingle();
+            }}
             disabled={props.busy}
             error={props.urlError ?? undefined}
             rightSection={

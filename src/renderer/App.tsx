@@ -4,7 +4,7 @@ import {
   Stack,
   Transition
 } from '@mantine/core';
-import type { DownloadEvent, ProgressSnapshot, Settings } from '@shared/types';
+import type { DownloadEvent, JobStatus, ProgressSnapshot, Settings } from '@shared/types';
 import { TitleBar } from './components/TitleBar';
 import { ActionCard, type Mode } from './components/ActionCard';
 import { ProgressCard } from './components/ProgressCard';
@@ -15,12 +15,22 @@ const defaultSettings: Settings = {
   destinationDir: '',
   format: 'mp3',
   mp3BitrateKbps: 192,
-  youtubeClient: 'android',
+  youtubeClient: 'default',
   useCookiesFromBrowser: false,
   cookiesBrowser: 'chrome',
   userAgent: '',
   verbose: false
 };
+
+// Long playlists produce thousands of lines; keeping them all makes every update re-render a huge list.
+const MAX_LOG_LINES = 500;
+
+let logSeq = 0;
+function appendLog(lines: UiLogLine[], level: string, message: string): UiLogLine[] {
+  const next = lines.length >= MAX_LOG_LINES ? lines.slice(lines.length - MAX_LOG_LINES + 1) : lines.slice();
+  next.push({ id: String(++logSeq), level, message });
+  return next;
+}
 
 export function App() {
   const api = window.mediaSaver;
@@ -30,7 +40,8 @@ export function App() {
   const [batchLabel, setBatchLabel] = useState<string | null>(null);
   const [batchFile, setBatchFile] = useState<{ filePath: string; urls: string[] } | null>(null);
   const [mode, setMode] = useState<Mode>('single');
-  const [status, setStatus] = useState<'idle' | 'running' | 'cancelling' | 'finished' | 'error'>('idle');
+  const [status, setStatus] = useState<JobStatus>('idle');
+  const [doneMessage, setDoneMessage] = useState<string | null>(null);
   const [progress, setProgress] = useState<ProgressSnapshot>({});
   const [logs, setLogs] = useState<UiLogLine[]>([]);
   const [urlError, setUrlError] = useState<string | null>(null);
@@ -38,7 +49,7 @@ export function App() {
   const [progressPulse, setProgressPulse] = useState(false);
 
   const lastErrorRef = useRef<string | null>(null);
-  const uid = () => (globalThis.crypto?.randomUUID ? globalThis.crypto.randomUUID() : `${Date.now()}-${Math.random()}`);
+  const log = (level: string, message: string) => setLogs((l) => appendLog(l, level, message));
 
   const verbose = settings.verbose;
 
@@ -50,25 +61,25 @@ export function App() {
     return api.onEvent((evt: DownloadEvent) => {
       if (evt.type === 'status') {
         setStatus(evt.status);
-        if (evt.message) {
-          setLogs((l) => [...l, { id: uid(), level: 'info', message: evt.message! }]);
-        }
+        if (evt.message) log('info', evt.message);
+        if (evt.status === 'finished') setDoneMessage(evt.message ?? null);
         if (evt.status === 'running') {
           setProgressPulse(true);
           setTimeout(() => setProgressPulse(false), 1000);
         }
       } else if (evt.type === 'log') {
-        setLogs((l) => [...l, { id: uid(), level: evt.level, message: evt.message }]);
+        log(evt.level, evt.message);
       } else if (evt.type === 'progress') {
         setProgress((p) => ({ ...p, ...evt.progress }));
         const { itemIndex, itemCount } = evt.progress;
         if (itemIndex && itemCount) setBatchLabel(`Item ${itemIndex}/${itemCount}`);
       } else if (evt.type === 'finished') {
-        setStatus('finished');
+        // The worker already sent the final status ('finished' or 'cancelled'); only fill in if it did not.
+        setStatus((s) => (s === 'running' || s === 'cancelling' ? 'finished' : s));
       } else if (evt.type === 'error') {
         setStatus('error');
         lastErrorRef.current = evt.message;
-        setLogs((l) => [...l, { id: uid(), level: 'error', message: evt.message }]);
+        log('error', evt.message);
       }
     });
   }, [api]);
@@ -81,8 +92,13 @@ export function App() {
   const busy = status === 'running' || status === 'cancelling';
 
   async function updateSettings(patch: Partial<Settings>) {
-    const next = await api.setSettings(patch);
-    setSettings(next);
+    // Update the UI right away; waiting for the IPC round trip makes text inputs drop keystrokes.
+    setSettings((s) => ({ ...s, ...patch }));
+    try {
+      await api.setSettings(patch);
+    } catch (e) {
+      log('error', `Could not save settings: ${e instanceof Error ? e.message : String(e)}`);
+    }
   }
 
   async function chooseDestination() {
@@ -93,56 +109,72 @@ export function App() {
 
   async function pasteUrl() {
     const clip = await navigator.clipboard?.readText();
-    if (clip != null) setUrl(clip);
+    if (clip != null) setUrl(clip.trim());
     setUrlError(null);
   }
 
+  function resetRun() {
+    setLogs([]);
+    setProgress({});
+    setDoneMessage(null);
+    lastErrorRef.current = null;
+  }
+
+  async function start(run: () => Promise<void>) {
+    try {
+      await run();
+    } catch (e) {
+      const message = e instanceof Error ? e.message.replace(/^Error invoking remote method '[^']+': (Error: )?/, '') : String(e);
+      setStatus('error');
+      lastErrorRef.current = message;
+      log('error', message);
+    }
+  }
+
   async function startSingle() {
+    if (busy) return;
     if (!settings.destinationDir) {
       setDestError('Choose a destination folder first.');
-      setLogs((l) => [...l, { id: uid(), level: 'error', message: 'Please choose a destination folder first.' }]);
+      log('error', 'Please choose a destination folder first.');
       return;
     }
     if (!url.trim()) {
       setUrlError('Paste a link to begin.');
       return;
     }
-    setLogs([]);
-    setProgress({});
+    resetRun();
     setBatchLabel(null);
-    lastErrorRef.current = null;
     setMode('single');
-    await api.startSingle({ url: url.trim(), options: { ...settings } });
+    await start(() => api.startSingle({ url: url.trim(), options: { ...settings } }));
   }
 
   async function chooseTxt() {
     if (!settings.destinationDir) {
       setDestError('Choose a destination folder first.');
-      setLogs((l) => [...l, { id: uid(), level: 'error', message: 'Please choose a destination folder first.' }]);
+      log('error', 'Please choose a destination folder first.');
       return;
     }
     const res = await api.chooseTxtFile();
     if (res.cancelled) return;
     if (res.urls.length === 0) {
-      setLogs((l) => [...l, { id: uid(), level: 'error', message: 'No URLs found in TXT file.' }]);
+      log('error', 'No URLs found in TXT file.');
       return;
     }
     setBatchFile({ filePath: res.filePath, urls: res.urls });
     setMode('batch');
-    setLogs((l) => [...l, { id: uid(), level: 'info', message: `Loaded ${res.urls.length} URLs from ${res.filePath}` }]);
+    log('info', `Loaded ${res.urls.length} URLs from ${res.filePath}`);
   }
 
   async function startBatch() {
+    if (busy) return;
     if (!batchFile) {
-      setLogs((l) => [...l, { id: uid(), level: 'error', message: 'Choose a TXT file first.' }]);
+      log('error', 'Choose a TXT file first.');
       return;
     }
-    setLogs([]);
-    setProgress({});
+    resetRun();
     setBatchLabel(`Item 1/${batchFile.urls.length}`);
-    lastErrorRef.current = null;
     setMode('batch');
-    await api.startBatch({ urls: batchFile.urls, options: { ...settings } });
+    await start(() => api.startBatch({ urls: batchFile.urls, options: { ...settings } }));
   }
 
   async function cancel() {
@@ -221,8 +253,10 @@ export function App() {
                       progress={progress}
                       pulse={progressPulse}
                       destinationDir={settings.destinationDir}
+                      doneMessage={doneMessage}
                       errorSummary={lastErrorRef.current}
                       onCopyErrorDetails={status === 'error' ? copyErrorDetails : undefined}
+                      onOpenFolder={settings.destinationDir ? () => api.openFolder(settings.destinationDir) : undefined}
                     />
                     <LogsCard verbose={verbose} lines={filteredLogs} onClear={clearLogs} onCopyAll={copyAllLogs} />
                   </div>
@@ -235,5 +269,3 @@ export function App() {
     </AppShell>
   );
 }
-
-

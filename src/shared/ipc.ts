@@ -17,6 +17,7 @@ export type IpcApi = {
   startSingle(args: IpcStartSingleArgs): Promise<void>;
   startBatch(args: IpcStartBatchArgs): Promise<void>;
   cancelCurrent(): Promise<void>;
+  openFolder(folderPath: string): Promise<void>;
 
   getSettings(): Promise<Settings>;
   setSettings(patch: Partial<Settings>): Promise<Settings>;

@@ -15,10 +15,10 @@ export function LogsCard(props: {
   const viewport = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
-    // Auto-scroll to bottom on new logs.
+    // Auto-scroll to bottom on new logs. Instant, since smooth scrolling restarts on every line and lags.
     if (!viewport.current) return;
-    viewport.current.scrollTo({ top: viewport.current.scrollHeight, behavior: 'smooth' });
-  }, [props.lines.length]);
+    viewport.current.scrollTop = viewport.current.scrollHeight;
+  }, [props.lines]);
 
   return (
     <div className={`${surface.card} ${surface.hoverable}`} style={{ borderRadius: 20, padding: 18, height: 320 }}>

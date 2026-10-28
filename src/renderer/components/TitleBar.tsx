@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { IconMinus, IconSquare, IconX, IconBolt } from '@tabler/icons-react';
+import { IconMinus, IconSquare, IconX, IconDownload } from '@tabler/icons-react';
 import styles from './TitleBar.module.css';
 import type { UiStatus } from './StatusPill';
 
@@ -24,7 +24,9 @@ export function TitleBar(props: { status: UiStatus; batchLabel?: string | null }
   const statusLabel =
     props.status === 'cancelling'
       ? 'CANCELLING'
-      : props.status === 'running'
+      : props.status === 'cancelled'
+        ? 'CANCELLED'
+        : props.status === 'running'
         ? 'RUNNING'
         : props.status === 'finished'
           ? 'DONE'
@@ -35,9 +37,9 @@ export function TitleBar(props: { status: UiStatus; batchLabel?: string | null }
   return (
     <div className={styles.bar}>
       <div className={styles.left}>
-        {/* Monochrome icon: minimal, no gradients. */}
+        {/* Same tile as the app icon and the skipit.space listing. */}
         <div className={styles.iconWrap} aria-hidden>
-          <IconBolt size={18} />
+          <IconDownload size={16} stroke={2.2} />
         </div>
         <div className={styles.title}>Media Saver</div>
       </div>

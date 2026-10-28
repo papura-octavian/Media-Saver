@@ -1,4 +1,4 @@
-import { app, BrowserWindow, dialog, ipcMain, Menu } from 'electron';
+import { app, BrowserWindow, dialog, ipcMain, Menu, shell } from 'electron';
 import path from 'node:path';
 import fs from 'node:fs/promises';
 import { DownloadManager } from './download/DownloadManager';
@@ -13,7 +13,7 @@ let mainWindow: BrowserWindow | null = null;
 let downloadManager: DownloadManager | null = null;
 
 function sendToRenderer(evt: DownloadEvent) {
-  if (!mainWindow) return;
+  if (!mainWindow || mainWindow.isDestroyed()) return;
   mainWindow.webContents.send('dm:event', evt);
 }
 
@@ -111,6 +111,10 @@ async function registerIpc() {
     await downloadManager!.cancelCurrent();
   });
 
+  ipcMain.handle('ui:openFolder', async (_evt, folderPath: string) => {
+    if (folderPath) await shell.openPath(folderPath);
+  });
+
   ipcMain.handle('ui:getSettings', async () => getSettings());
   ipcMain.handle('ui:setSettings', async (_evt, patch) => patchSettings(patch));
 }
@@ -122,15 +126,20 @@ async function main() {
   app.setAppUserModelId('com.skipit.media-saver');
   Menu.setApplicationMenu(null);
 
-  await createMainWindow();
-
   downloadManager = new DownloadManager({
     appPath: app.getAppPath(),
     resourcesPath: process.resourcesPath,
+    userDataPath: app.getPath('userData'),
     onEvent: sendToRenderer
   });
 
+  // Handlers must exist before the renderer loads, or its first getSettings() call fails and the saved
+  // destination folder is silently replaced by the defaults.
   await registerIpc();
+  await createMainWindow();
+  downloadManager.warmUp();
+
+  app.on('will-quit', () => downloadManager?.dispose());
 
   app.on('window-all-closed', () => {
     if (process.platform !== 'darwin') app.quit();

@@ -10,7 +10,7 @@ jobs:
   build-windows:
     runs-on: windows-latest
     permissions:
-      contents: read
+      contents: write
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -18,45 +18,33 @@ jobs:
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
           cache: npm
 
       - name: Install dependencies
         run: npm ci
 
-      # Policy: we do NOT commit binaries into git.
-      # For CI builds, maintainers can download trusted binaries here.
-      # NOTE: You should pin versions and verify SHA256 hashes for reproducible releases.
-      - name: Download yt-dlp + FFmpeg (maintainer responsibility)
-        shell: pwsh
-        run: |
-          New-Item -ItemType Directory -Force -Path resources/bin | Out-Null
-
-          # yt-dlp (example: latest; recommended: pin a version + verify hash)
-          Invoke-WebRequest -Uri "https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp.exe" -OutFile "resources/bin/yt-dlp.exe"
-
-          # FFmpeg LGPL build (example link; recommended: pin a version + verify hash)
-          # Replace the URL below with your chosen trusted LGPL build source.
-          $ffmpegZip = "ffmpeg-lgpl.zip"
-          Invoke-WebRequest -Uri "https://github.com/BtbN/FFmpeg-Builds/releases/latest/download/ffmpeg-master-latest-win64-lgpl.zip" -OutFile $ffmpegZip
-          Expand-Archive -Path $ffmpegZip -DestinationPath ".ffmpeg" -Force
-          Remove-Item $ffmpegZip -Force
-
-          $ffmpegExe = Get-ChildItem -Recurse ".ffmpeg" -Filter "ffmpeg.exe" | Select-Object -First 1
-          $ffprobeExe = Get-ChildItem -Recurse ".ffmpeg" -Filter "ffprobe.exe" | Select-Object -First 1
-          if (-not $ffmpegExe) { throw "ffmpeg.exe not found in archive" }
-
-          Copy-Item $ffmpegExe.FullName "resources/bin/ffmpeg.exe" -Force
-          if ($ffprobeExe) { Copy-Item $ffprobeExe.FullName "resources/bin/ffprobe.exe" -Force }
-
+      # Policy: we do NOT commit binaries into git. scripts/fetch-binaries.ps1 (run by `npm run dist`)
+      # downloads the latest yt-dlp and the BtbN LGPL FFmpeg build. The app keeps yt-dlp updated itself.
       - name: Build installer
         run: npm run dist
+        env:
+          CSC_IDENTITY_AUTO_DISCOVERY: "false"
 
-      - name: Upload artifacts
+      - name: Upload artifacts (manual runs)
+        if: github.event_name == 'workflow_dispatch'
         uses: actions/upload-artifact@v4
         with:
           name: Media-Saver-Windows
           path: |
-            dist/**
+            dist/*.exe
+            dist/*.blockmap
 
-
+      - name: Publish GitHub Release
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            dist/*.exe
+            dist/*.blockmap
+          generate_release_notes: true
